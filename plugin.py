@@ -13,7 +13,7 @@
         <param field="Port" label="Port" width="300px" required="true" default="1883"/>
         <!-- <param field="Mode5" label="MQTT QoS" width="300px" default="0"/> -->
         <param field="Username" label="Username" width="300px"/>
-        <param field="Password" label="Password" width="300px"/>
+        <param field="Password" label="Password" width="300px" password="true"/>
         <!-- <param field="Mode1" label="CA Filename" width="300px"/> -->
 
         <param field="Mode2" label="Discovery topic" width="300px" default="homeassistant"/>
@@ -135,7 +135,7 @@ class MqttClient:
         if 'Payload' in Data:
             payloadStr = Data['Payload'].decode('utf8','replace')
             payloadStr = str(payloadStr.encode('unicode_escape'))
-        #Domoticz.Debug("MqttClient::onMessage called for connection: '"+Connection.Name+"' type:'"+Data['Verb']+"' topic:'"+topic+"' payload:'" + payloadStr + "'")
+            #Domoticz.Debug("MqttClient::onMessage called for connection: '"+Connection.Name+"' type:'"+Data['Verb']+"' topic:'"+topic+"' payload:'" + payloadStr + "'")
 
         if Data['Verb'] == "CONNACK":
             self.isConnected = True
@@ -230,6 +230,7 @@ ABBREVIATIONS = {
     'pl_osc_on': 'payload_oscillation_on',
     'pl_stop': 'payload_stop',
     'pl_unlk': 'payload_unlock',
+    'pos_t': 'position_topic',
     'pow_cmd_t': 'power_command_topic',
     'ret': 'retain',
     'rgb_cmd_tpl': 'rgb_command_template',
@@ -368,6 +369,12 @@ class BasePlugin:
         self.mqttClient = MqttClient(self.mqttserveraddress, self.mqttserverport, self.onMQTTConnected, self.onMQTTDisconnected, self.onMQTTPublish, self.onMQTTSubscribed)
 
         self.copyDevices()
+        
+        # for k, Device in Devices.items():
+            # Domoticz.Log("name: " + Device.Name)
+            # c = json.loads(Device.Options['config'])
+            # Domoticz.Log("config: " + str(c))
+            
 
     def onConnect(self, Connection, Status, Description):
         self.mqttClient.onConnect(Connection, Status, Description)
@@ -406,6 +413,7 @@ class BasePlugin:
             discoverytopiclen = len(self.discoverytopiclist)
             # Discovery topic format:
             # <discovery_prefix>/<component>/[<node_id>/]<object_id>/<action>
+            # e.g. homeassistant /  cover  / j3tech  / 100102040000 / config
             if len(topiclist) == discoverytopiclen + 3 or len(topiclist) == discoverytopiclen + 4:
               component = topiclist[discoverytopiclen]
               if len(topiclist) == discoverytopiclen + 3:
@@ -504,11 +512,15 @@ class BasePlugin:
                 elif Command == "On":
                     payload = "ON"
                     if "payload_on" in configdict: payload = configdict["payload_on"]
+                    elif 0xf4 == Devices[Unit].Type and 0x49 == Devices[Unit].SubType and 16 == Devices[Unit].SwitchType and "payload_open" in configdict: # Blinds Percentage Inverted
+                        payload = configdict["payload_open"]
                     elif "payload_close" in configdict: payload = configdict["payload_close"]
                     self.mqttClient.Publish(configdict["command_topic"],payload)
                 elif Command == "Off":
                     payload = "OFF"
                     if "payload_off" in configdict: payload = configdict["payload_off"]
+                    elif 0xf4 == Devices[Unit].Type and 0x49 == Devices[Unit].SubType and 16 == Devices[Unit].SwitchType and "payload_close" in configdict: # Blinds Percentage Inverted
+                        payload = configdict["payload_close"]
                     elif "payload_open" in configdict: payload = configdict["payload_open"]
                     self.mqttClient.Publish(configdict["command_topic"],payload)
                 elif Command == "Stop":
@@ -585,8 +597,9 @@ class BasePlugin:
                 Device.SubType == 0x49 and  # sSwitchGeneralSwitch
                 ((Device.SwitchType == 3) or  # Blind (up/down buttons)
                  (Device.SwitchType == 15) or # Venetian blinds EU (up/down/stop buttons)
+                 (Device.SwitchType == 16) or # Blinds Percentage Inverted
                  (Device.SwitchType == 13))): # Blinds Percentage
-                devicetype = 'blinds' 
+                devicetype = 'cover' 
             elif (Device.Type == 0xf4 and   # pTypeGeneralSwitch
                 Device.SubType == 0x49 and  # sSwitchGeneralSwitch
                 Device.SwitchType == 9):    # STYPE_PushOn
@@ -788,6 +801,12 @@ class BasePlugin:
             Type = 0xf4        # pTypeGeneralSwitch
             Subtype = 0x49     # sSwitchGeneralSwitch
             switchTypeDomoticz = 13 # Blinds percent
+            try:
+                if 'j3tech' in config['device']['manufacturer']:
+                    switchTypeDomoticz = 16 # Blinds percent  inverted
+            except:
+                pass
+
         elif devicetype == 'cover':
             TypeName = 'Switch'
             Type = 0xf4        # pTypeGeneralSwitch
@@ -918,8 +937,8 @@ class BasePlugin:
             if "position_topic" in devicetopics:
                 payload = message
                 sValue = payload
-                nValue = 0
-                Domoticz.Log("sValue: '" + str(sValue) + "'")
+                nValue = 2
+                Domoticz.Debug("sValue: '" + str(sValue) + "'")
                 updatedevice = True
 
             if "rgb_state_topic" in devicetopics:
