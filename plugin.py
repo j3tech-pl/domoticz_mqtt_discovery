@@ -797,6 +797,13 @@ class BasePlugin:
             Type = 0xf4        # pTypeGeneralSwitch
             Subtype = 0x49     # sSwitchGeneralSwitch
             switchTypeDomoticz = 9 # STYPE_PushOn
+        elif devicetype == 'sensor':
+            TypeName = 'General'
+            if 'unit_of_measurement' in config:
+                if '%' == config['unit_of_measurement']:
+                    Type = 243         # pTypeGeneralSwitch
+                    Subtype = 6        # percentage
+                
         elif (devicetype == 'cover') and ('set_position_topic' in config):
             Type = 0xf4        # pTypeGeneralSwitch
             Subtype = 0x49     # sSwitchGeneralSwitch
@@ -909,6 +916,10 @@ class BasePlugin:
                          "payload_stop" not in configdict and "state_stop" not in configdict and payload == 'STOP'):
                         updatedevice = True
                         nValue = 17  # state = STOP  in blinds
+                    if  "unit_of_measurement" in configdict:
+                        updatedevice = True
+                        nValue = int(payload)
+                        sValue = payload
                     Domoticz.Debug("nValue: '" + str(nValue) + "'")
             if "brightness_state_topic" in devicetopics:
                 Domoticz.Debug("Got brightness_state_topic")
