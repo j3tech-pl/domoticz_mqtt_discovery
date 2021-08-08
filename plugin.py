@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #           MQTT discovery plugin
 #
 """
@@ -803,6 +804,9 @@ class BasePlugin:
                 if '%' == config['unit_of_measurement']:
                     Type = 243         # pTypeGeneralSwitch
                     Subtype = 6        # percentage
+                if '°C' == config['unit_of_measurement']:
+                    Type = 80         #
+                    Subtype = 5       # temperature
                 
         elif (devicetype == 'cover') and ('set_position_topic' in config):
             Type = 0xf4        # pTypeGeneralSwitch
